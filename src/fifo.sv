@@ -16,7 +16,7 @@ module fifo #(
 logic [$clog2(DEPTH) - 1 : 0] read_ptr;
 logic [$clog2(DEPTH) - 1 : 0] write_ptr;
 logic [$clog2(DEPTH) : 0] count;
-logic [T-1:0] buffer [0:DEPTH-1];
+T buffer [0:DEPTH-1];
 
 always @(posedge clk) begin
     if (reset) begin

@@ -13,7 +13,7 @@ module circular_buffer #(
     output logic empty
 );
 
-logic [T-1:0] buffer [0:DEPTH-1];
+T buffer [0:DEPTH-1];
 logic [$clog2(DEPTH) : 0] read_ptr;
 logic [$clog2(DEPTH) : 0] write_ptr;
 
