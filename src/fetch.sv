@@ -4,7 +4,7 @@ module  fetch#(
     input logic     clk,
     input logic     reset,
 
-    input logic     branch,
+    input logic     take_branch,
     input T         branch_loc,
 
     input T         instr_from_cache,
@@ -42,7 +42,7 @@ always_ff @(posedge clk) begin
             valid_reg <= valid_reg;
         end
         else begin
-            if (branch) begin
+            if (take_branch) begin
                 pc_reg <= branch_loc;
                 valid_reg <= 1'b1;
             end
