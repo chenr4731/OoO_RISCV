@@ -29,7 +29,7 @@ assign pc_to_to_cache = pc_reg;
 assign pc_to_decode = pc_reg;
 assign instr_to_decode = instr_from_cache;
 
-assign valid = valid_reg;
+assign valid = valid_reg; // Need to double check when this is set
 
 always_ff @(posedge clk) begin
     if (reset) begin
