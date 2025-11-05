@@ -1,6 +1,5 @@
 module decoder#(
     parameter type T = logic [31:0]
-    parameter [6:0]
 ) (
     input T         instruction,
     input T         i_pc,
@@ -17,7 +16,7 @@ module decoder#(
     output logic [4:0] rd,
     output logic ALUsrc,
     output logic Branch,
-    output T immediate,
+    output T immediate
 
 
 );
