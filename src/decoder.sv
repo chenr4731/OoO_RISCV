@@ -30,6 +30,9 @@ module decoder#(
     output logic Regwrite
 );
 
+
+assign o_valid = i_valid;
+assign o_ready = i_ready;
 // OPCODES
 localparam OPC_LUI    = 7'b0110111;
 localparam OPC_JALR   = 7'b1100111;
