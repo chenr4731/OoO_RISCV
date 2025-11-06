@@ -17,8 +17,8 @@ module  fetch#(
     output logic    valid
 );
 
-logic T pc_reg;
-logic T pc_next_def;
+T pc_reg;
+T pc_next_def;
 logic stall;
 logic valid_reg;
 
