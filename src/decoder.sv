@@ -18,6 +18,7 @@ module decoder#(
     output logic ALUsrc,
     output logic Branch,
     output T immediate,
+    output [1:0] PCsrc
 
 
 );
@@ -46,10 +47,13 @@ assign ALUsrc = (opcode == OPC_IMM ||
 
 assign Branch = (opcode == OPC_JALR || opcode == OPC_BRANCH);
 
-assign Memread = //
-assign Memwrite = //
-assign Regwrite = //
-assign PCsrc = //
+assign Memread = opcode == OPC_LOAD; // Read when opcode is OPC_LOAD
+assign Memwrite = opcode == OPC_STORE; // Write to memory when need to store
+assign Regwrite = (opcode == OPC_LOAD) || 
+                    (opcode == OPC_REG) || 
+                    (opcode == OPC_IMM) || 
+                    (opcode == OPC_JALR); // Write to register file when these opcodes are seen
+assign PCsrc = //Choose from JALR, BRANCH, or PC + 4
 
 
 // Determine ALUOp
