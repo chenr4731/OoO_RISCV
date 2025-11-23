@@ -6,12 +6,12 @@ module skid_buffer_struct #(
 
     // upstream (producer -> skid)
     input logic       valid_in,
-    output logic      ready_in,
+    output logic      ready_out,  // Ready signal going back to producer
     input T           data_in,
 
     // downstream (skid -> consumer)
     output logic      valid_out,
-    input logic       ready_out,
+    input logic       ready_in,   // Ready signal from consumer
     output T          data_out
 );
 
@@ -27,13 +27,13 @@ always @(posedge clk) begin
     end
     else begin
         if (bypass) begin
-            if (valid_in && !ready_out) begin
+            if (valid_in && !ready_in) begin
                 buffer <= data_in;
                 bypass <= 1'b0;
             end
         end
         else begin
-            if (ready_out) begin
+            if (ready_in) begin
                 bypass <= 1'b1;
             end
         end

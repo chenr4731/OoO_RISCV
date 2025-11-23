@@ -1,4 +1,4 @@
-module  fetch#(
+module fetch#(
     parameter type T = logic [31:0]
 ) (
     input logic     clk,
@@ -22,10 +22,10 @@ T pc_next_def;
 logic stall;
 logic valid_reg;
 
-assign stall = !ready && !valid_reg;
+assign stall = !ready && valid_reg;
 
 assign pc_next_def = pc_reg + 4; // Default case, need to add offset later
-assign pc_to_to_cache = pc_reg;
+assign pc_to_cache = pc_reg;
 assign pc_to_decode = pc_reg;
 assign instr_to_decode = instr_from_cache;
 

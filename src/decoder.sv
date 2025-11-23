@@ -1,18 +1,17 @@
 module decoder#(
     parameter type T = logic [31:0]
-    parameter [6:0]
 ) (
     input T         instruction,
-    input T         i_pc,
+    input logic [8:0] i_pc,
     input logic     i_valid,
 
     input logic i_ready,
 
     // Back to fetch skid buffer
-    output T        o_ready,
+    output logic    o_ready,
 
     // To rename stage skid buffer
-    output T        o_pc,
+    output logic [8:0] o_pc,
     output logic o_valid,
     
 
@@ -24,7 +23,7 @@ module decoder#(
     output logic Branch,
     output T immediate,
     output logic [1:0] ALUOp,
-    output logic FUtype, // 0 for Addition or 1 for memory
+    output logic [1:0] FUtype, // 0 for ALU, 1 for Branch, 2 for LSU
     output logic Memread,
     output logic Memwrite,
     output logic Regwrite
@@ -62,7 +61,8 @@ assign Regwrite = (instruction[6:0] == OPC_LOAD) ||
                     (instruction[6:0] == OPC_IMM) || 
                     (instruction[6:0] == OPC_JALR); // Write to register file when these opcodes are seen
 
-assign FUtype = (OPC_STORE || OPC_LOAD);
+assign FUtype = (instruction[6:0] == OPC_STORE || instruction[6:0] == OPC_LOAD) ? 2'b10 :
+                ((instruction[6:0] == OPC_JALR || instruction[6:0] == OPC_BRANCH) ? 2'b01 : 2'b00);
 
 // Determine ALUOp
 always_comb begin

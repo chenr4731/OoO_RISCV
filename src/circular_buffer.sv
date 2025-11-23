@@ -29,12 +29,11 @@ always @(posedge clk) begin
             write_ptr <= write_ptr + 1;
         end
         if (read_en && !empty) begin
-            read_data <= buffer[read_ptr[$clog2(DEPTH)-1:0]];
             read_ptr <= read_ptr + 1;
         end
     end
 end
-
+assign read_data = buffer[read_ptr[$clog2(DEPTH)-1:0]];
 
 assign full = write_ptr[$clog2(DEPTH)] != read_ptr[$clog2(DEPTH)] && 
               write_ptr[$clog2(DEPTH)-1:0] == read_ptr[$clog2(DEPTH)-1:0];
