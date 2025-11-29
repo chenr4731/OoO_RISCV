@@ -19,9 +19,13 @@ module reservation_station #(
     output logic [$clog2(RS_SIZE)-1:0] issue_idx,
     input logic eu_ready,
 
-    // Wakeup (from writeback - for future use)
-    input logic wb_en,
-    input logic [PHYS_REG_BITS-1:0] wb_prd,
+    // Wakeup (from writeback - multiple sources)
+    input logic wb_en_alu,
+    input logic [PHYS_REG_BITS-1:0] wb_prd_alu,
+    input logic wb_en_branch,
+    input logic [PHYS_REG_BITS-1:0] wb_prd_branch,
+    input logic wb_en_lsu,
+    input logic [PHYS_REG_BITS-1:0] wb_prd_lsu,
 
     // Flush
     input logic flush
@@ -70,6 +74,8 @@ module reservation_station #(
             for (int j = 0; j < RS_SIZE; j++) begin
                 entries[j].valid <= 1'b0;
                 entries[j].ready <= 1'b0;
+                entries[j].prs1_ready <= 1'b0;
+                entries[j].prs2_ready <= 1'b0;
             end
         end
         else begin
@@ -88,8 +94,10 @@ module reservation_station #(
                 entries[alloc_idx].rob_tag <= dispatch_instr.rob_tag;
                 entries[alloc_idx].pc <= dispatch_instr.pc;
 
-                // For Assignment 2: all instructions are ready immediately
-                // (no data dependencies to track yet)
+                // For Phase 3: Assume all operands are ready at dispatch
+                // (In a full implementation, we would check a ready bit table)
+                entries[alloc_idx].prs1_ready <= 1'b1;
+                entries[alloc_idx].prs2_ready <= 1'b1;
                 entries[alloc_idx].ready <= 1'b1;
             end
 
@@ -98,13 +106,31 @@ module reservation_station #(
                 entries[issue_idx].valid <= 1'b0;
             end
 
-            // Wakeup logic (for future - when we track dependencies)
-            // For now, instructions are marked ready on allocation
-            if (wb_en) begin
-                for (int j = 0; j < RS_SIZE; j++) begin
-                    if (entries[j].valid && !entries[j].ready) begin
-                        // Check if this instruction was waiting for wb_prd
-                        // This will be implemented properly in later assignments
+            // Wakeup logic: Check all valid entries and mark operands ready
+            for (int j = 0; j < RS_SIZE; j++) begin
+                if (entries[j].valid && !entries[j].ready) begin
+                    // Check if prs1 is ready
+                    if (!entries[j].prs1_ready) begin
+                        if ((wb_en_alu && entries[j].prs1 == wb_prd_alu) ||
+                            (wb_en_branch && entries[j].prs1 == wb_prd_branch) ||
+                            (wb_en_lsu && entries[j].prs1 == wb_prd_lsu)) begin
+                            entries[j].prs1_ready <= 1'b1;
+                        end
+                    end
+
+                    // Check if prs2 is ready
+                    if (!entries[j].prs2_ready) begin
+                        if ((wb_en_alu && entries[j].prs2 == wb_prd_alu) ||
+                            (wb_en_branch && entries[j].prs2 == wb_prd_branch) ||
+                            (wb_en_lsu && entries[j].prs2 == wb_prd_lsu)) begin
+                            entries[j].prs2_ready <= 1'b1;
+                        end
+                    end
+
+                    // Mark instruction ready if both operands are ready
+                    if ((entries[j].prs1_ready || !entries[j].prs1_ready) &&
+                        (entries[j].prs2_ready || !entries[j].prs2_ready)) begin
+                        entries[j].ready <= (entries[j].prs1_ready && entries[j].prs2_ready);
                     end
                 end
             end

@@ -41,6 +41,8 @@ package ooo_types;
     typedef struct packed {
         logic valid;                          // Slot occupied
         logic ready;                          // Both operands ready
+        logic prs1_ready;                     // Source 1 ready
+        logic prs2_ready;                     // Source 2 ready
         logic [PHYS_REG_BITS-1:0] prs1;
         logic [PHYS_REG_BITS-1:0] prs2;
         logic [PHYS_REG_BITS-1:0] prd;

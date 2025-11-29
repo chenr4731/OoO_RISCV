@@ -379,6 +379,12 @@ module OoO_top #(
     logic rob_commit_reg_write;
     logic [31:0] dispatch_mispredict_target;
 
+    // ROB completion signals (from execution units)
+    logic rob_complete_en;
+    logic [ROB_BITS-1:0] rob_complete_tag;
+    logic rob_branch_taken;
+    logic [31:0] rob_branch_target;
+
     rob rob_inst(
         .clk(clk),
         .rst(rst),
@@ -391,10 +397,10 @@ module OoO_top #(
         .checkpoint_map_table(rename_checkpoint_map_table),
         .checkpoint_freelist_ptr(rename_checkpoint_freelist_ptr),
         .checkpoint_rob_tag(rename_checkpoint_rob_tag),
-        .complete_en(1'b0),          // TODO: Connect to execution units
-        .complete_tag(4'd0),
-        .branch_taken(1'b0),
-        .branch_target(32'd0),
+        .complete_en(rob_complete_en),
+        .complete_tag(rob_complete_tag),
+        .branch_taken(rob_branch_taken),
+        .branch_target(rob_branch_target),
         .commit_en(dispatch_commit_en),
         .commit_ard(rob_commit_ard),
         .commit_prd(rob_commit_prd),
@@ -422,11 +428,18 @@ module OoO_top #(
     rs_entry_t issue_lsu_entry;
     logic [RS_BITS-1:0] issue_lsu_idx;
 
-    // Writeback signals (TODO: Connect to execution units)
-    logic wb_en;
-    logic [PHYS_REG_BITS-1:0] wb_prd;
-    assign wb_en = 1'b0;
-    assign wb_prd = 7'd0;
+    // Writeback signals (from execution units)
+    logic wb_en_alu;
+    logic [PHYS_REG_BITS-1:0] wb_prd_alu;
+    logic [31:0] wb_data_alu;
+
+    logic wb_en_branch;
+    logic [PHYS_REG_BITS-1:0] wb_prd_branch;
+    logic [31:0] wb_data_branch;
+
+    logic wb_en_lsu;
+    logic [PHYS_REG_BITS-1:0] wb_prd_lsu;
+    logic [31:0] wb_data_lsu;
 
     reservation_station #(.RS_SIZE(RS_ALU_SIZE)) rs_alu(
         .clk(clk),
@@ -439,9 +452,13 @@ module OoO_top #(
         .issue_en(issue_alu_en),
         .issue_entry(issue_alu_entry),
         .issue_idx(issue_alu_idx),
-        .eu_ready(1'b1),         // TODO: Connect to ALU execution unit
-        .wb_en(wb_en),
-        .wb_prd(wb_prd),
+        .eu_ready(alu_ready),
+        .wb_en_alu(wb_en_alu),
+        .wb_prd_alu(wb_prd_alu),
+        .wb_en_branch(wb_en_branch),
+        .wb_prd_branch(wb_prd_branch),
+        .wb_en_lsu(wb_en_lsu),
+        .wb_prd_lsu(wb_prd_lsu),
         .flush(dispatch_mispredict)
     );
 
@@ -456,9 +473,13 @@ module OoO_top #(
         .issue_en(issue_branch_en),
         .issue_entry(issue_branch_entry),
         .issue_idx(issue_branch_idx),
-        .eu_ready(1'b1),         // TODO: Connect to Branch execution unit
-        .wb_en(wb_en),
-        .wb_prd(wb_prd),
+        .eu_ready(branch_ready),
+        .wb_en_alu(wb_en_alu),
+        .wb_prd_alu(wb_prd_alu),
+        .wb_en_branch(wb_en_branch),
+        .wb_prd_branch(wb_prd_branch),
+        .wb_en_lsu(wb_en_lsu),
+        .wb_prd_lsu(wb_prd_lsu),
         .flush(dispatch_mispredict)
     );
 
@@ -473,9 +494,13 @@ module OoO_top #(
         .issue_en(issue_lsu_en),
         .issue_entry(issue_lsu_entry),
         .issue_idx(issue_lsu_idx),
-        .eu_ready(1'b1),         // TODO: Connect to LSU execution unit
-        .wb_en(wb_en),
-        .wb_prd(wb_prd),
+        .eu_ready(lsu_ready),
+        .wb_en_alu(wb_en_alu),
+        .wb_prd_alu(wb_prd_alu),
+        .wb_en_branch(wb_en_branch),
+        .wb_prd_branch(wb_prd_branch),
+        .wb_en_lsu(wb_en_lsu),
+        .wb_prd_lsu(wb_prd_lsu),
         .flush(dispatch_mispredict)
     );
 
@@ -512,15 +537,141 @@ module OoO_top #(
         .rd2_branch(prf_rd2_branch),
         .rd1_lsu(prf_rd1_lsu),
         .rd2_lsu(prf_rd2_lsu),
-        .we_alu(1'b0),           // TODO: Connect to ALU writeback
-        .wa_alu(7'd0),
-        .wd_alu(32'd0),
-        .we_branch(1'b0),        // TODO: Connect to Branch writeback
-        .wa_branch(7'd0),
-        .wd_branch(32'd0),
-        .we_lsu(1'b0),           // TODO: Connect to LSU writeback
-        .wa_lsu(7'd0),
-        .wd_lsu(32'd0)
+        .we_alu(wb_en_alu),
+        .wa_alu(wb_prd_alu),
+        .wd_alu(wb_data_alu),
+        .we_branch(wb_en_branch),
+        .wa_branch(wb_prd_branch),
+        .wd_branch(wb_data_branch),
+        .we_lsu(wb_en_lsu),
+        .wa_lsu(wb_prd_lsu),
+        .wd_lsu(wb_data_lsu)
     );
+
+    // ========================================================================
+    // EXECUTION UNITS
+    // ========================================================================
+
+    // ALU Execution Unit
+    logic alu_ready;
+    logic alu_complete_en;
+    logic [ROB_BITS-1:0] alu_complete_tag;
+
+    alu alu_unit(
+        .clk(clk),
+        .rst(rst),
+        .issue_en(issue_alu_en),
+        .issue_entry(issue_alu_entry),
+        .rs1_data(prf_rd1_alu),
+        .rs2_data(prf_rd2_alu),
+        .ready(alu_ready),
+        .wb_en(wb_en_alu),
+        .wb_prd(wb_prd_alu),
+        .wb_data(wb_data_alu),
+        .complete_en(alu_complete_en),
+        .complete_tag(alu_complete_tag),
+        .flush(dispatch_mispredict)
+    );
+
+    // Branch Execution Unit
+    logic branch_ready;
+    logic branch_complete_en;
+    logic [ROB_BITS-1:0] branch_complete_tag;
+    logic branch_taken;
+    logic [31:0] branch_target;
+    logic branch_mispredict;
+    logic [31:0] branch_mispredict_target;
+
+    branch_unit branch_unit_inst(
+        .clk(clk),
+        .rst(rst),
+        .issue_en(issue_branch_en),
+        .issue_entry(issue_branch_entry),
+        .rs1_data(prf_rd1_branch),
+        .rs2_data(prf_rd2_branch),
+        .ready(branch_ready),
+        .wb_en(wb_en_branch),
+        .wb_prd(wb_prd_branch),
+        .wb_data(wb_data_branch),
+        .complete_en(branch_complete_en),
+        .complete_tag(branch_complete_tag),
+        .branch_taken(branch_taken),
+        .branch_target(branch_target),
+        .mispredict(branch_mispredict),
+        .mispredict_target(branch_mispredict_target),
+        .flush(dispatch_mispredict)
+    );
+
+    // LSU (Load Store Unit)
+    logic lsu_ready;
+    logic lsu_complete_en;
+    logic [ROB_BITS-1:0] lsu_complete_tag;
+
+    // Data Memory (BRAM) - placeholder for Xilinx IP
+    logic [31:0] dmem_addr;
+    logic dmem_en;
+    logic dmem_we;
+    logic [31:0] dmem_wdata;
+    logic [31:0] dmem_rdata;
+
+    // For simulation, use a simple array
+    // In synthesis, replace with Xilinx Block Memory Generator IP
+    logic [31:0] data_memory [0:511];
+
+    always_ff @(posedge clk) begin
+        if (dmem_en) begin
+            if (dmem_we) begin
+                data_memory[dmem_addr[10:2]] <= dmem_wdata;
+            end
+            dmem_rdata <= data_memory[dmem_addr[10:2]];
+        end
+    end
+
+    lsu lsu_unit(
+        .clk(clk),
+        .rst(rst),
+        .issue_en(issue_lsu_en),
+        .issue_entry(issue_lsu_entry),
+        .rs1_data(prf_rd1_lsu),
+        .rs2_data(prf_rd2_lsu),
+        .ready(lsu_ready),
+        .mem_addr(dmem_addr),
+        .mem_en(dmem_en),
+        .mem_we(dmem_we),
+        .mem_wdata(dmem_wdata),
+        .mem_rdata(dmem_rdata),
+        .wb_en(wb_en_lsu),
+        .wb_prd(wb_prd_lsu),
+        .wb_data(wb_data_lsu),
+        .complete_en(lsu_complete_en),
+        .complete_tag(lsu_complete_tag),
+        .flush(dispatch_mispredict)
+    );
+
+    // ========================================================================
+    // ROB COMPLETION LOGIC
+    // ========================================================================
+    // Combine completion signals from all execution units
+    // For simplicity, we OR them together (in a full design, we'd need arbitration)
+    assign rob_complete_en = alu_complete_en || branch_complete_en || lsu_complete_en;
+
+    // Priority: ALU > Branch > LSU
+    always_comb begin
+        if (alu_complete_en) begin
+            rob_complete_tag = alu_complete_tag;
+            rob_branch_taken = 1'b0;
+            rob_branch_target = 32'd0;
+        end
+        else if (branch_complete_en) begin
+            rob_complete_tag = branch_complete_tag;
+            rob_branch_taken = branch_taken;
+            rob_branch_target = branch_target;
+        end
+        else begin
+            rob_complete_tag = lsu_complete_tag;
+            rob_branch_taken = 1'b0;
+            rob_branch_target = 32'd0;
+        end
+    end
 
 endmodule

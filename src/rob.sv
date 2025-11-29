@@ -148,17 +148,4 @@ module rob (
         end
     end
 
-    // For Assignment 2: Mark all instructions as ready immediately (no execution)
-    // This will be removed in later assignments when we have actual execution units
-    always_ff @(posedge clk) begin
-        if (!rst) begin
-            for (int i = 0; i < ROB_SIZE; i++) begin
-                if (rob_entries[i].valid && !rob_entries[i].ready) begin
-                    // Auto-complete after 1 cycle (for testing only)
-                    rob_entries[i].ready <= 1'b1;
-                end
-            end
-        end
-    end
-
 endmodule
